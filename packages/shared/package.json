@@ -1,0 +1,21 @@
+{
+  "name": "@pulse-kit/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --dts --format esm,cjs --clean",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsup": "^8.1.0",
+    "vitest": "^1.6.0"
+  }
+}

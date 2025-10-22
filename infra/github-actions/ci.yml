@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "yarn"
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Build shared package
+        run: yarn --cwd packages/shared build
+      - name: Run shared tests
+        run: yarn --cwd packages/shared test
+      - name: Run API tests
+        run: yarn --cwd apps/api test
+      - name: Run web tests
+        run: yarn --cwd apps/web test
+      - name: Run extension tests
+        run: yarn --cwd apps/extension test
+      - name: Build API
+        run: yarn --cwd apps/api build
+      - name: Build web app
+        run: yarn --cwd apps/web build
+      - name: Build extension
+        run: yarn --cwd apps/extension build

@@ -1,0 +1,45 @@
+{
+  "name": "@pulse-kit/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^6.1.1",
+    "@mui/material": "^6.1.1",
+    "@pulse-kit/shared": "workspace:*",
+    "@tanstack/react-query": "^5.51.21",
+    "ky": "^1.12.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.1.0",
+    "@types/chrome": "^0.0.270",
+    "@types/node": "^20.14.11",
+    "@types/react": "^18.3.8",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react-swc": "^3.7.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "jsdom": "^24.1.0",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.10",
+    "vitest": "^1.6.0"
+  }
+}
