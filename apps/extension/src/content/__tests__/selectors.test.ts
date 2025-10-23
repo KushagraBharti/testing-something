@@ -1,36 +1,44 @@
 import { describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
-import { extractTimelineSnippets, extractTweetSnippet } from "@pulse-kit/shared";
+import { collectSnippetsWithDebug, extractTweetSnippet } from "@pulse-kit/shared";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const buildDom = (html: string) => {
-  const dom = new JSDOM(html);
-  return dom.window.document;
-};
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-describe("DOM selectors", () => {
-  it("extracts snippets from a timeline", () => {
-    const doc = buildDom(`
-      <div data-testid="cellInnerDiv">
-        <div data-testid="tweetText">First tweet about builders.</div>
-      </div>
-      <div data-testid="cellInnerDiv">
-        <div data-testid="tweetText">Second tweet about idea flow.</div>
-      </div>
-    `);
+const fixture = (name: string) =>
+  readFileSync(join(__dirname, "fixtures", name), "utf-8");
 
-    const snippets = extractTimelineSnippets(doc, "home", 30);
-    expect(snippets).toHaveLength(2);
-    expect(snippets[0]).toMatch(/First tweet/);
+describe("selector fallbacks", () => {
+  it("captures timeline using primary selector", () => {
+    const dom = new JSDOM(fixture("timeline-primary.html"));
+    const { snippets, diagnostics } = collectSnippetsWithDebug(dom.window.document, "home", 30);
+    expect(snippets).toEqual([
+      "Primary selector tweet text one.",
+      "Primary selector tweet text two.",
+    ]);
+    expect(diagnostics[0]).toEqual(
+      expect.objectContaining({ label: "Timeline primary", matches: 2 }),
+    );
   });
 
-  it("extracts main tweet snippet", () => {
-    const doc = buildDom(`
-      <article data-testid="tweet">
-        <div data-testid="tweetText">Main tweet body here.</div>
-      </article>
-    `);
+  it("falls back when primary selector misses", () => {
+    const dom = new JSDOM(fixture("timeline-fallback.html"));
+    const { snippets, diagnostics } = collectSnippetsWithDebug(dom.window.document, "home", 30);
+    expect(snippets).toEqual([
+      "Fallback tweet content alpha.",
+      "Fallback tweet content beta.",
+    ]);
+    expect(diagnostics[0].matches).toBe(0);
+    expect(diagnostics[1]).toEqual(
+      expect.objectContaining({ label: "Timeline fallback", matches: 2 }),
+    );
+  });
 
-    const snippet = extractTweetSnippet(doc);
-    expect(snippet).toContain("Main tweet");
+  it("extracts tweet snippet", () => {
+    const dom = new JSDOM(fixture("tweet.html"));
+    expect(extractTweetSnippet(dom.window.document)).toBe("Primary tweet text body.");
   });
 });

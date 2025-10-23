@@ -4,6 +4,7 @@ export interface SessionState {
   userId: string | null;
   handle: string | null;
   token: string | null;
+  refreshToken: string | null;
   expiresAt?: number | null;
 }
 
@@ -19,6 +20,7 @@ const defaultState: SessionState = {
   userId: null,
   handle: null,
   token: null,
+  refreshToken: null,
   expiresAt: null,
 };
 
@@ -47,8 +49,19 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     if (session.token) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "pulse:setToken",
+          token: session.token,
+          refreshToken: session.refreshToken,
+          expiresAt: session.expiresAt ?? null,
+        });
+      }
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "pulse:setToken", token: null, refreshToken: null });
+      }
     }
   }, [session]);
 
@@ -60,6 +73,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSessionState(defaultState);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY);
+    }
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: "pulse:setToken", token: null, refreshToken: null });
     }
   }, []);
 

@@ -12,7 +12,8 @@
     "dev:ext": "yarn --cwd apps/extension dev",
     "dev:api": "yarn --cwd apps/api dev",
     "lint": "yarn workspaces foreach run lint",
-    "test": "yarn workspaces foreach run test"
+    "test": "yarn workspaces foreach run test",
+    "qa": "yarn --cwd packages/shared test && yarn --cwd apps/api test && yarn --cwd apps/extension test && yarn --cwd apps/web test"
   },
   "devDependencies": {
     "@types/node": "^20.14.11",

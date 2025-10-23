@@ -1,6 +1,7 @@
 
 import type { EnvBindings } from '../env.js';
 import { getSupabase } from '../lib/supabase.js';
+import { ensureAnalyticsPreference, setAnalyticsOptIn } from '../lib/analyticsStore.js';
 
 export const recordUserLogin = async (
   env: EnvBindings,
@@ -19,6 +20,7 @@ export const recordUserLogin = async (
   if (error) {
     throw new Error(`Failed to upsert user: ${error.message}`);
   }
+  await ensureAnalyticsPreference(env, user.id);
 };
 
 export const saveEncryptedKey = async (
@@ -48,21 +50,32 @@ export const updateSettings = async (
     temp?: number;
     want_trends?: boolean;
     trend_sources_max?: number;
+    want_analytics?: boolean;
   },
 ) => {
   const client = getSupabase(env);
+  const payload: Record<string, unknown> = {
+    user_id: userId,
+    model: settings.model,
+    temp: settings.temp ?? 0.7,
+    want_trends: settings.want_trends ?? false,
+    trend_sources_max: settings.trend_sources_max ?? 1,
+  };
+
+  if (typeof settings.want_analytics === 'boolean') {
+    payload.want_analytics = settings.want_analytics;
+  }
+
   const { error } = await client.from('settings').upsert(
-    {
-      user_id: userId,
-      model: settings.model,
-      temp: settings.temp ?? 0.7,
-      want_trends: settings.want_trends ?? false,
-      trend_sources_max: settings.trend_sources_max ?? 1,
-    },
+    payload,
     { onConflict: 'user_id' },
   );
 
   if (error) {
     throw new Error(`Failed to update settings: ${error.message}`);
+  }
+
+  if (typeof settings.want_analytics === 'boolean') {
+    setAnalyticsOptIn(userId, settings.want_analytics);
   }
 };

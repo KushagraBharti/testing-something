@@ -1,3 +1,7 @@
+/**
+ * NOTE: Legacy Live Search API is deprecated on Dec 15, 2025.
+ * This provider uses the newer tool-calling interface with explicit source caps.
+ */
 import { z } from 'zod';
 import type { ClusterResponseOutput } from '@pulse-kit/shared';
 import type { EnvBindings } from '../../env.js';
@@ -99,10 +103,17 @@ export const fetchTrendSparks = async (
   env: EnvBindings,
   clusters: ClusterResponseOutput,
   limit: number,
-): Promise<{ trend_notes: string[]; sources_used: Array<{ name: string; url?: string }> }> => {
+): Promise<{
+  trend_notes: string[];
+  sources_used: Array<{ name: string; url?: string }>;
+  estimated_cost_usd: number;
+}> => {
   if (!env.XAI_API_KEY || limit === 0) {
-    return { trend_notes: [], sources_used: [] };
+    return { trend_notes: [], sources_used: [], estimated_cost_usd: 0 };
   }
+
+  const sourceCap = Math.max(0, Math.min(2, limit));
+  const preferredSources = sourceCap === 2 ? ['X', 'News'] : ['X'];
 
   const payload = await callXaiJson({
     env,
@@ -116,13 +127,24 @@ export const fetchTrendSparks = async (
         role: 'user',
         content: `Analyze these clusters JSON: ${JSON.stringify(
           clusters,
-        )}. Provide up to ${limit} timely sparks referencing current X or news context.`,
+        )}. Provide up to ${sourceCap} timely sparks referencing ${preferredSources.join(
+          ' and ',
+        )}.`,
       },
     ],
     jsonSchema: trendsJsonSchema,
     maxTokens: 600,
     retries: 1,
-    tools: [{ type: 'web_search', web_search: { enable_multi_step_thinking: true } }],
+    tools: [
+      {
+        type: 'web_search',
+        web_search: {
+          enable_multi_step_thinking: true,
+          source_cap: sourceCap,
+          preferred_sources: preferredSources,
+        },
+      },
+    ],
   });
 
   const parsed = trendSchema.safeParse(payload);
@@ -130,5 +152,12 @@ export const fetchTrendSparks = async (
     throw new Error('Trend sparks payload failed validation');
   }
 
-  return parsed.data;
+  const sourcesUsed = parsed.data.sources_used.slice(0, sourceCap);
+  const estimatedCost = Math.round((sourcesUsed.length * 0.025 + Number.EPSILON) * 1000) / 1000;
+
+  return {
+    trend_notes: parsed.data.trend_notes.slice(0, sourceCap),
+    sources_used: sourcesUsed,
+    estimated_cost_usd: estimatedCost,
+  };
 };

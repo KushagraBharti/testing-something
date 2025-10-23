@@ -10,6 +10,7 @@ const AuthCallbackPage = () => {
   const navigate = useNavigate();
   const api = useApiClient();
   const { setSession } = useSession();
+  const sessionToken = params.get("session_token") ?? import.meta.env.VITE_SESSION_TOKEN_SECRET;
 
   const exchange = useMutation({
     mutationFn: async (code: string) => {
@@ -17,6 +18,7 @@ const AuthCallbackPage = () => {
         json: {
           user_id: params.get("user_id") ?? `user-${Date.now()}`,
           handle: params.get("handle") ?? "creator",
+          session_token: sessionToken,
           settings: {
             model: "openai",
             want_trends: false,
@@ -24,19 +26,32 @@ const AuthCallbackPage = () => {
           },
         },
       });
-      return (await response.json()) as { token: string; expires_in: number };
+      return (await response.json()) as {
+        token: string;
+        refresh_token: string;
+        expires_in: number;
+        analytics_enabled?: boolean;
+      };
     },
     onSuccess: (payload) => {
       setSession({
         userId: params.get("user_id") ?? "user",
         handle: params.get("handle") ?? "creator",
         token: payload.token,
+        refreshToken: payload.refresh_token,
         expiresAt: Date.now() + payload.expires_in * 1000,
       });
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "pulse:setAnalytics",
+          enabled: payload.analytics_enabled ?? false,
+        });
+      }
     },
   });
 
   const queryToken = params.get("token");
+  const queryRefresh = params.get("refresh_token");
 
   useEffect(() => {
     if (queryToken) {
@@ -44,15 +59,19 @@ const AuthCallbackPage = () => {
         userId: params.get("user_id") ?? "user",
         handle: params.get("handle") ?? "creator",
         token: queryToken,
+        refreshToken: queryRefresh ?? null,
         expiresAt: Date.now() + 15 * 60 * 1000,
       });
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "pulse:setAnalytics", enabled: false });
+      }
     } else {
       const code = params.get("code");
       if (code && !exchange.isPending && !exchange.isSuccess && !exchange.isError) {
         exchange.mutate(code);
       }
     }
-  }, [queryToken, params, exchange, setSession]);
+  }, [queryToken, queryRefresh, params, exchange, setSession]);
 
   const status = useMemo(() => {
     if (queryToken || exchange.isSuccess) return "success" as const;

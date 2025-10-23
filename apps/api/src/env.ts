@@ -1,4 +1,4 @@
-import { env as nodeEnv } from 'node:process';
+import { env as nodeEnv } from "node:process";
 
 export interface EnvBindings {
   OPENAI_API_KEY?: string;
@@ -8,6 +8,10 @@ export interface EnvBindings {
   SUPABASE_ANON_KEY?: string;
   JWT_SECRET: string;
   API_BASE_URL?: string;
+  WEB_ORIGIN?: string;
+  EXTENSION_ORIGIN?: string;
+  BYO_ENCRYPTION_KEY?: string;
+  SESSION_TOKEN_SECRET?: string;
 }
 
 export const readNodeEnv = (): EnvBindings => ({
@@ -16,8 +20,12 @@ export const readNodeEnv = (): EnvBindings => ({
   X_API_BEARER: nodeEnv.X_API_BEARER,
   SUPABASE_URL: nodeEnv.SUPABASE_URL,
   SUPABASE_ANON_KEY: nodeEnv.SUPABASE_ANON_KEY,
-  JWT_SECRET: nodeEnv.JWT_SECRET ?? 'change_me',
-  API_BASE_URL: nodeEnv.API_BASE_URL ?? 'http://localhost:8787',
+  JWT_SECRET: nodeEnv.JWT_SECRET ?? "change_me",
+  API_BASE_URL: nodeEnv.API_BASE_URL ?? "http://localhost:8787",
+  WEB_ORIGIN: nodeEnv.WEB_ORIGIN ?? "http://localhost:5173",
+  EXTENSION_ORIGIN: nodeEnv.EXTENSION_ORIGIN ?? "chrome-extension://mock-id",
+  BYO_ENCRYPTION_KEY: nodeEnv.BYO_ENCRYPTION_KEY,
+  SESSION_TOKEN_SECRET: nodeEnv.SESSION_TOKEN_SECRET,
 });
 
 export const resolveEnv = (bindings?: Partial<EnvBindings>): EnvBindings => {

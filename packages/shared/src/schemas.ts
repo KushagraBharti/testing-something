@@ -1,5 +1,6 @@
 
 import { z } from "zod";
+import { countWords, stripVariantSelectors } from "./utils.js";
 
 export const StyleProfileSchema = z.object({
   voice: z.string().min(1).max(480),
@@ -38,12 +39,32 @@ export const IdeasRequestSchema = z
     });
   });
 
-export const IdeaOutlineItemSchema = z.object({
-  hook: z.string().min(1).max(120),
-  mini_outline: z.array(z.string().min(1).max(140)).min(5).max(7),
-  virality_score: z.number().int().min(0).max(100),
-  recommended_time: z.enum(["morning", "afternoon", "evening"]),
-});
+export const IdeaOutlineItemSchema = z
+  .object({
+    hook: z.string().min(1).max(120),
+    mini_outline: z.array(z.string().min(1).max(160)).min(5).max(7),
+    virality_score: z.number().int().min(0).max(100),
+    recommended_time: z.enum(["morning", "afternoon", "evening"]),
+  })
+  .superRefine((item, ctx) => {
+    if (countWords(item.hook) > 18) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hook must contain 18 words or fewer",
+        path: ["hook"],
+      });
+    }
+
+    item.mini_outline.forEach((bullet, index) => {
+      if (stripVariantSelectors(bullet).length > 140) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Outline bullet exceeds 140 visible characters",
+          path: ["mini_outline", index],
+        });
+      }
+    });
+  });
 
 export const IdeaTopicSchema = z.object({
   topic: z.string().min(1).max(140),

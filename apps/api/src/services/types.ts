@@ -19,10 +19,19 @@ export interface IdeasContext {
 export interface IdeaEngineResult {
   response: IdeasResponse;
   sources_used: Array<{ name: string; url?: string }>;
+  metrics: {
+    trendCost: number;
+    trendCalls: number;
+    trendsUsed: boolean;
+    sourcesUsedCount: number;
+  };
 }
 
 export interface ReplyCopilotResult {
   response: RepliesResponse;
+  metrics: {
+    generatedAt: number;
+  };
 }
 
 export interface StyleProfileResult {
@@ -30,4 +39,5 @@ export interface StyleProfileResult {
 }
 
 export { IdeasRequest, IdeasResponse, RepliesRequest, RepliesResponse };
+
 

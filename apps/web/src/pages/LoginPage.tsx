@@ -9,28 +9,44 @@ const LoginPage = () => {
   const { setSession } = useSession();
   const navigate = useNavigate();
 
+  const sessionToken = import.meta.env.VITE_SESSION_TOKEN_SECRET ?? "demo-session";
+
   const demoLogin = useMutation({
     mutationFn: async () => {
       const response = await api.post("auth/refresh", {
         json: {
           user_id: "demo-user",
           handle: "demo_creator",
+          session_token: sessionToken,
           settings: {
             model: "openai",
             want_trends: false,
             trend_sources_max: 1,
+            want_analytics: false,
           },
         },
       });
-      return (await response.json()) as { token: string; expires_in: number };
+      return (await response.json()) as {
+        token: string;
+        refresh_token: string;
+        expires_in: number;
+        analytics_enabled?: boolean;
+      };
     },
     onSuccess: (payload) => {
       setSession({
         userId: "demo-user",
         handle: "demo_creator",
         token: payload.token,
+        refreshToken: payload.refresh_token,
         expiresAt: Date.now() + payload.expires_in * 1000,
       });
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "pulse:setAnalytics",
+          enabled: payload.analytics_enabled ?? false,
+        });
+      }
       navigate("/settings");
     },
   });

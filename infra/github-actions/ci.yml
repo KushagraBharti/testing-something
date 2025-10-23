@@ -34,3 +34,6 @@ jobs:
         run: yarn --cwd apps/web build
       - name: Build extension
         run: yarn --cwd apps/extension build
+      - name: QA sweep
+        run: yarn qa
+

@@ -1,5 +1,6 @@
 import { defineManifest } from "@crxjs/vite-plugin";
 
+// Manifest keeps MV3 permissions minimal; Chrome enforces strict CSP with no remote code execution.
 export default defineManifest(async () => ({
   manifest_version: 3,
   name: "Pulse Kit",

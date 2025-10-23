@@ -146,6 +146,11 @@ export const clusterSnippetsWithOpenAI = async (
   return parsed.data;
 };
 
+interface GenerationOptions {
+  temperature?: number;
+  systemReminder?: string;
+}
+
 export const generateIdeasWithOpenAI = async (
   env: EnvBindings,
   payload: {
@@ -154,6 +159,7 @@ export const generateIdeasWithOpenAI = async (
     clusters: ClusterResponseOutput;
     trend_notes: string[];
   },
+  options: GenerationOptions = {},
 ): Promise<IdeasResponseOutput> => {
   const { snippets, style_profile, clusters, trend_notes } = payload;
   const userPrompt = `${IDEAS_USER_PROMPT}
@@ -162,18 +168,26 @@ Snippets JSON: ${JSON.stringify(snippets)}
 Style Profile JSON: ${JSON.stringify(style_profile)}
 Trend Notes JSON: ${JSON.stringify(trend_notes)}`;
 
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: 'You are IdeaEngine, a strategist who returns strict JSON.',
+    },
+  ];
+
+  if (options.systemReminder) {
+    messages.push({ role: 'system', content: options.systemReminder });
+  }
+
+  messages.push({ role: 'user', content: userPrompt });
+
   const result = await callOpenAiJson({
     env,
-    messages: [
-      {
-        role: 'system',
-        content: 'You are IdeaEngine, a strategist who returns strict JSON.',
-      },
-      { role: 'user', content: userPrompt },
-    ],
+    messages,
     jsonSchema: ideasJsonSchema,
     maxTokens: 1600,
-    retries: 1,
+    temperature: options.temperature ?? 0.2,
+    retries: 0,
   });
 
   const parsed = IdeasResponseSchema.safeParse(result);
@@ -191,22 +205,31 @@ export const generateRepliesWithOpenAI = async (
     context_summary: string | null;
     style_profile: unknown;
   },
+  options: GenerationOptions = {},
 ): Promise<RepliesResponseOutput> => {
   const userPrompt = `${REPLIES_USER_PROMPT}
 Tweet Payload JSON: ${JSON.stringify(payload)}`;
 
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: 'You are ReplyCopilot, crafting concise on-brand replies.',
+    },
+  ];
+
+  if (options.systemReminder) {
+    messages.push({ role: 'system', content: options.systemReminder });
+  }
+
+  messages.push({ role: 'user', content: userPrompt });
+
   const result = await callOpenAiJson({
     env,
-    messages: [
-      {
-        role: 'system',
-        content: 'You are ReplyCopilot, crafting concise on-brand replies.',
-      },
-      { role: 'user', content: userPrompt },
-    ],
+    messages,
     jsonSchema: repliesJsonSchema,
     maxTokens: 400,
-    retries: 1,
+    temperature: options.temperature ?? 0.2,
+    retries: 0,
   });
 
   const parsed = RepliesResponseSchema.safeParse(result);

@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
-  Divider,
   FormControl,
   FormControlLabel,
   FormLabel,
@@ -14,17 +13,17 @@ import {
   RadioGroup,
   Slider,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import ChipInput from "../components/ChipInput";
 import { useSession } from "../hooks/useSession";
 import { useApiClient } from "../lib/apiClient";
 import type { StyleProfile } from "@pulse-kit/shared";
 
 const STYLE_STORAGE_KEY = "pulse-kit-style-profile";
+const ANALYTICS_STORAGE_KEY = "pulse-kit-analytics-opt-in";
 
 const defaultProfile: StyleProfile = {
   voice: "Analytical, optimistic operator",
@@ -45,6 +44,11 @@ const loadProfile = (): StyleProfile => {
   }
 };
 
+const loadAnalyticsPreference = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ANALYTICS_STORAGE_KEY) === "true";
+};
+
 const SettingsPage = () => {
   const api = useApiClient();
   const { session, setSession } = useSession();
@@ -55,8 +59,75 @@ const SettingsPage = () => {
   const [openaiKey, setOpenaiKey] = useState("");
   const [xaiKey, setXaiKey] = useState("");
   const [xKey, setXKey] = useState("");
-
+  const [wantAnalytics, setWantAnalytics] = useState<boolean>(loadAnalyticsPreference);
+  const [analyticsInitialized, setAnalyticsInitialized] = useState(false);
   const styleProfileChanged = useMemo(() => JSON.stringify(styleProfile), [styleProfile]);
+
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: "pulse:setStyleProfile",
+        profile: JSON.parse(styleProfileChanged) as StyleProfile,
+      });
+    }
+  }, [styleProfileChanged]);
+
+  useEffect(() => {
+    if (analyticsInitialized && typeof window !== "undefined") {
+      window.localStorage.setItem(ANALYTICS_STORAGE_KEY, String(wantAnalytics));
+    }
+  }, [analyticsInitialized, wantAnalytics]);
+
+const trendMetricsQuery = useQuery({
+  queryKey: ["trend-metrics"],
+  queryFn: async () =>
+    api.get("metrics/trends").json<{
+      estimated_usd_rolling_24h: number;
+      calls_24h: number;
+      want_analytics: boolean;
+    }>(),
+  enabled: Boolean(session.token),
+});
+const trendMetrics = trendMetricsQuery.data;
+const trendSpend = trendMetrics?.estimated_usd_rolling_24h ?? 0;
+const trendCalls = trendMetrics?.calls_24h ?? 0;
+
+  useEffect(() => {
+    if (!trendMetricsQuery.data || analyticsInitialized) {
+      return;
+    }
+
+    setWantAnalytics(trendMetricsQuery.data.want_analytics);
+    setAnalyticsInitialized(true);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        ANALYTICS_STORAGE_KEY,
+        String(trendMetricsQuery.data.want_analytics),
+      );
+    }
+
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: "pulse:setAnalytics",
+        enabled: trendMetricsQuery.data.want_analytics,
+      });
+    }
+  }, [trendMetricsQuery.data, analyticsInitialized]);
+
+  const sessionToken = import.meta.env.VITE_SESSION_TOKEN_SECRET ?? "demo-session";
+
+  useEffect(() => {
+    if (!analyticsInitialized && !session.token) {
+      setAnalyticsInitialized(true);
+    }
+  }, [analyticsInitialized, session.token]);
+
+  useEffect(() => {
+    if (trendMetricsQuery.status === "error" && !analyticsInitialized) {
+      setAnalyticsInitialized(true);
+    }
+  }, [trendMetricsQuery.status, analyticsInitialized]);
 
   const saveSettings = useMutation({
     mutationFn: async () => {
@@ -68,14 +139,22 @@ const SettingsPage = () => {
         json: {
           user_id: session.userId,
           handle: session.handle ?? session.userId,
+          refresh_token: session.refreshToken ?? undefined,
+          session_token: sessionToken,
           settings: {
             model,
             want_trends: wantTrends,
             trend_sources_max: trendSourcesMax,
+            want_analytics: wantAnalytics,
           },
         },
       });
-      return (await response.json()) as { token: string; expires_in: number };
+      return (await response.json()) as {
+        token: string;
+        refresh_token: string;
+        expires_in: number;
+        analytics_enabled?: boolean;
+      };
     },
     onSuccess: (payload) => {
       if (session.userId) {
@@ -83,8 +162,18 @@ const SettingsPage = () => {
           userId: session.userId,
           handle: session.handle,
           token: payload.token,
+          refreshToken: payload.refresh_token,
           expiresAt: Date.now() + payload.expires_in * 1000,
         });
+      }
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "pulse:setAnalytics",
+          enabled: payload.analytics_enabled ?? wantAnalytics,
+        });
+      }
+      if (trendMetricsQuery.status !== "idle") {
+        trendMetricsQuery.refetch();
       }
     },
   });
@@ -201,6 +290,20 @@ const SettingsPage = () => {
                 Choose your default model and trend-spark behavior. The extension will mirror these defaults.
               </Typography>
             </Stack>
+            <Box
+              sx={{
+                alignSelf: "flex-start",
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 999,
+                backgroundColor: "rgba(29,155,240,0.16)",
+                border: "1px solid rgba(29,155,240,0.32)",
+              }}
+            >
+              <Typography variant="caption" color="primary.light">
+                Trend spend (24h): ${trendSpend.toFixed(2)} · {trendCalls} calls
+              </Typography>
+            </Box>
             <FormControl>
               <FormLabel>Preferred Model</FormLabel>
               <RadioGroup row value={model} onChange={(event) => setModel(event.target.value as "openai" | "xai") }>
@@ -230,6 +333,20 @@ const SettingsPage = () => {
                 max={2}
               />
             </Box>
+            <Stack spacing={1}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={wantAnalytics}
+                    onChange={(event) => setWantAnalytics(event.target.checked)}
+                  />
+                }
+                label="Help improve Pulse Kit"
+              />
+              <Typography variant="caption" color="text.secondary">
+                Shares anonymous usage counts to guide quality improvements. No content or secrets are ever sent.
+              </Typography>
+            </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <Button
                 variant="contained"
