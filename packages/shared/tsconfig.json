@@ -5,7 +5,8 @@
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
-    "composite": false
+    "composite": false,
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src", "__tests__"],
   "exclude": ["dist"]
